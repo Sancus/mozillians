@@ -32,6 +32,10 @@ COUNTRIES = product_details.get_regions('en-US')
 USERNAME_MAX_LENGTH = 30
 AVATAR_SIZE = (300, 300)
 
+PRIVILEGED = 1
+EMPLOYEES = 2
+MOZILLIANS = 3
+PUBLIC = 4
 
 def _calculate_photo_filename(instance, filename):
     """Generate a unique filename for uploaded photo."""
@@ -91,6 +95,17 @@ class UserProfile(models.Model, SearchMixin):
 
     def get_absolute_url(self):
         return reverse('profile', args=[self.user.username])
+
+    @property
+    def level(self):
+        """Return user privacy clearance."""
+        if self.user.is_superuser:
+            return PRIVILEGED
+        if self.groups.filter(name='staff').exists():
+            return EMPLOYEES
+        if self.is_vouched:
+            return MOZILLIANS
+        return PUBLIC
 
     def anonymize(self):
         """Remove personal info from a user"""
@@ -352,6 +367,23 @@ def remove_from_search_index(sender, instance, **kwargs):
             return
         else:
             raise e
+
+
+class PrivacySettings(models.Model):
+    PRIVACY_LEVELS = (
+        ( PRIVILEGED, 'Privileged'),
+        ( EMPLOYEES, 'Employees'),
+        ( MOZILLIANS, 'Mozillians'),
+        ( PUBLIC, 'Public'),
+    )
+
+    profile = models.ForeignKey(UserProfile)
+    profilefield_name = models.CharField(max_length=255, default='')
+    setting = models.IntegerField(max_length=1, default=MOZILLIANS,
+                                  choices=PRIVACY_LEVELS)
+
+    def __unicode__(self):
+        return self.profilefield_name
 
 
 class UsernameBlacklist(models.Model):
