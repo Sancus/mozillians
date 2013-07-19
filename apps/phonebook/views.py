@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.forms.models import inlineformset_factory
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.http import Http404, HttpResponseForbidden
 from django.shortcuts import redirect, render
@@ -18,7 +19,8 @@ from apps.common.helpers import get_privacy_level
 from apps.groups.helpers import stringify_groups
 from apps.groups.models import Group
 from apps.users.models import (COUNTRIES, EMPLOYEES, MOZILLIANS,
-                               PUBLIC, PRIVILEGED, UserProfile)
+                               PUBLIC, PRIVILEGED, UserProfile,
+                               Accounts)
 from apps.users.tasks import remove_from_basket_task
 from apps.users.views import _update_invites
 
@@ -110,6 +112,9 @@ def edit_profile(request):
     user_languages = stringify_groups(profile.languages.all().order_by('name'))
 
     user_form = forms.UserForm(request.POST or None, instance=user)
+    AccountsFormset = inlineformset_factory(UserProfile, Accounts, extra=3)
+    accounts_formset = AccountsFormset(request.POST or None, instance=profile)
+
     new_profile = False
     form = forms.ProfileForm
     if not profile.is_complete:
@@ -121,10 +126,11 @@ def edit_profile(request):
                         initial=dict(groups=user_groups, skills=user_skills,
                                      languages=user_languages))
 
-    if (user_form.is_valid() and profile_form.is_valid()):
+    if (user_form.is_valid() and profile_form.is_valid() and accounts_formset.is_valid()):
         old_username = request.user.username
         user_form.save()
         profile_form.save()
+        accounts_formset.save()
 
         # Notify the user that their old profile URL won't work.
         if new_profile:
@@ -138,6 +144,7 @@ def edit_profile(request):
 
     data = dict(profile_form=profile_form,
                 user_form=user_form,
+                accounts_formset = accounts_formset,
                 user_groups=user_groups,
                 my_vouches=UserProfile.objects.filter(vouched_by=profile),
                 profile=request.user.userprofile,

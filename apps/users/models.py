@@ -46,7 +46,6 @@ def _calculate_photo_filename(instance, filename):
     """Generate a unique filename for uploaded photo."""
     return os.path.join(settings.USER_AVATAR_DIR, str(uuid.uuid4()) + '.jpg')
 
-
 class UserProfileValuesQuerySet(ValuesQuerySet):
     """Custom ValuesQuerySet to support privacy.
 
@@ -650,3 +649,40 @@ class UsernameBlacklist(models.Model):
 
     class Meta:
         ordering = ['value']
+
+
+class Accounts(models.Model):
+    ACCOUNT_TYPES = (
+        (0, 'AMO'),
+        (1, 'Bugzilla'),
+        (2, 'Github'),
+        (3, 'MDN'),
+        (4, 'SUMO'),
+        (5, 'Facebook'),
+        (6, 'Twitter'),
+        (7, 'AIM'),
+        (8, 'Google Talk'),
+        (9, 'Skype'),
+        (10, 'Yahoo!'),
+    )
+    ACCOUNT_URLS = (
+        (0, 'https://addons.mozilla.org/'),
+        (1, ''),
+        (2, 'https://www.github.com/'),
+        (3, 'MDN'),
+        (4, 'SUMO'),
+        (5, 'https://www.facebook.com/'),
+        (6, 'https://www.twitter.com/'),
+        (7, 'AIM'),
+        (8, 'Google Talk'),
+        (9, 'Skype'),
+        (10, 'Yahoo!'),
+    )
+
+    user = models.ForeignKey(UserProfile)
+    username = models.CharField(max_length=255, default='', blank=True,
+                                verbose_name=_lazy('Username'))
+    type = models.PositiveIntegerField(default=0, choices=ACCOUNT_TYPES,
+                                       verbose_name = _lazy('Account'))
+    privacy = models.PositiveIntegerField(default=MOZILLIANS,
+                                          choices=PRIVACY_CHOICES)   

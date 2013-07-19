@@ -12,7 +12,7 @@ from tower import ugettext as _, ugettext_lazy as _lazy
 from apps.groups.models import Group, Skill, Language
 from apps.phonebook.widgets import MonthYearWidget
 from apps.users.helpers import validate_username
-from apps.users.models import User, UserProfile
+from apps.users.models import User, UserProfile, Accounts
 
 from models import Invite
 
