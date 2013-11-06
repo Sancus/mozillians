@@ -23,6 +23,7 @@ from tower import ugettext as _, ugettext_lazy as _lazy
 from mozillians.common.helpers import gravatar
 from mozillians.groups.models import (Group, GroupAlias, Skill, SkillAlias,
                                       Language, LanguageAlias)
+from mozillians.phonebook.validators import validate_website
 from mozillians.users.managers import (DEFAULT_PRIVACY_FIELDS, EMPLOYEES,
                                        MOZILLIANS, PRIVACY_CHOICES, PRIVILEGED,
                                        PUBLIC, PUBLIC_INDEXABLE_FIELDS,
@@ -79,7 +80,6 @@ class UserProfilePrivacyModel(models.Model):
     privacy_full_name = PrivacyField()
     privacy_ircname = PrivacyField()
     privacy_email = PrivacyField()
-    privacy_website = PrivacyField()
     privacy_bio = PrivacyField()
     privacy_city = PrivacyField()
     privacy_region = PrivacyField()
@@ -105,8 +105,6 @@ class UserProfile(UserProfilePrivacyModel, SearchMixin):
                                  verbose_name=_lazy(u'Full Name'))
     is_vouched = models.BooleanField(default=False)
     last_updated = models.DateTimeField(auto_now=True, default=datetime.now)
-    website = models.URLField(max_length=200, verbose_name=_lazy(u'Website'),
-                              default='', blank=True)
     vouched_by = models.ForeignKey('UserProfile', null=True, default=None,
                                    on_delete=models.SET_NULL, blank=True,
                                    related_name='vouchees')
@@ -214,7 +212,7 @@ class UserProfile(UserProfilePrivacyModel, SearchMixin):
             obj = cls.objects.get(pk=obj_id)
         d = {}
 
-        attrs = ('id', 'is_vouched', 'website', 'ircname',
+        attrs = ('id', 'is_vouched', 'ircname',
                  'region', 'city', 'allows_mozilla_sites',
                  'allows_community_sites')
         for a in attrs:
@@ -269,7 +267,6 @@ class UserProfile(UserProfilePrivacyModel, SearchMixin):
                 'allows_mozilla_sites': {'type': 'boolean'},
                 'allows_community_sites': {'type': 'boolean'},
                 'photo': {'type': 'boolean'},
-                'website': {'type': 'string', 'index': 'not_analyzed'},
                 'last_updated': {'type': 'date'},
                 'date_joined': {'type': 'date'}}}
 
@@ -307,8 +304,16 @@ class UserProfile(UserProfilePrivacyModel, SearchMixin):
     @property
     def accounts(self):
         if self._privacy_level:
-            return self.externalaccount_set.filter(privacy__gte=self._privacy_level)
-        return self.externalaccount_set.all()
+            return (self.externalaccount_set.filter(privacy__gte=self._privacy_level)
+                                           .exclude(type='WEBSITE'))
+        return self.externalaccount_set.all().exclude(type='WEBSITE')
+
+    @property
+    def websites(self):
+        if self._privacy_level:
+            return self.externalaccount_set.filter(type='WEBSITE',
+                                                   privacy__gte=self._privacy_level)
+        return self.externalaccount_set.filter(type='WEBSITE')
 
     @property
     def email(self):
@@ -562,21 +567,23 @@ class UsernameBlacklist(models.Model):
 
 class ExternalAccount(models.Model):
     ACCOUNT_TYPES = {
-        'AMO':{'name': 'Mozilla Add-ons', 'url': 'https://addons.mozilla.org/user/{username}/'},
+        'AMO':{'name': 'Mozilla Add-ons', 'url': 'https://addons.mozilla.org/user/{identifier}/'},
         'BMO':{'name': 'Bugzilla (BMO)', 'url': ('https://bugzilla.mozilla.org/'
-                                                 'user_profile?login={username}')},
-        'GITHUB':{'name': 'Github', 'url': 'https://github.com/{username}'},
-        'MDN':{'name': 'MDN', 'url': 'https://developer.mozilla.org/profiles/{username}'},
+                                                 'user_profile?login={identifier}')},
+        'GITHUB':{'name': 'Github', 'url': 'https://github.com/{identifier}'},
+        'MDN':{'name': 'MDN', 'url': 'https://developer.mozilla.org/profiles/{identifier}'},
         'SUMO':{'name': 'Mozilla Support', 'url': ''},
-        'FACEBOOK':{'name': 'Facebook', 'url': 'https://www.facebook.com/{username}'},
-        'TWITTER':{'name': 'Twitter', 'url': 'https://twitter.com/{username}'},
+        'FACEBOOK':{'name': 'Facebook', 'url': 'https://www.facebook.com/{identifier}'},
+        'TWITTER':{'name': 'Twitter', 'url': 'https://twitter.com/{identifier}'},
         'AIM':{'name': 'AIM', 'url': ''},
         'GTALK':{'name': 'Google Talk', 'url': ''},
         'SKYPE':{'name': 'Skype', 'url': ''},
-        'YAHOO':{'name': 'Yahoo! Messenger', 'url': ''},}
+        'YAHOO':{'name': 'Yahoo! Messenger', 'url': ''},
+        'WEBSITE':{'name': 'Website URL', 'url': '{identifier}', 'validator': validate_website}
+    }
 
     user = models.ForeignKey(UserProfile)
-    username = models.CharField(max_length=255, verbose_name=_lazy('Account Username'))
+    identifier = models.CharField(max_length=255, verbose_name=_lazy('Account Username'))
     type = models.CharField(
         max_length=30,
         choices=sorted([(k, v['name'])
@@ -585,8 +592,8 @@ class ExternalAccount(models.Model):
     privacy = models.PositiveIntegerField(default=MOZILLIANS,
                                           choices=PRIVACY_CHOICES)
 
-    def get_username_url(self):
-        url = self.ACCOUNT_TYPES[self.type]['url'].format(username=urlquote(self.username))
+    def get_identifier_url(self):
+        url = self.ACCOUNT_TYPES[self.type]['url'].format(identifier=urlquote(self.identifier))
         return iri_to_uri(url)
 
     class Meta:
