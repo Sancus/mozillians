@@ -12,7 +12,7 @@ from funfactory.helpers import urlparams
 from funfactory.urlresolvers import reverse
 from funfactory import utils
 from jingo import register
-from jinja2 import Markup
+from jinja2 import Markup, contextfunction
 from sorl.thumbnail import get_thumbnail
 
 
@@ -87,3 +87,30 @@ def markdown(text, allowed_tags=None, allowed_attributes=None, allowed_styles=No
     text = markdown_module.markdown(text, safe_mode='remove')
     clean_text = bleach.clean(text, allowed_tags, allowed_attributes, allowed_styles, strip=True)
     return Markup(clean_text)
+
+
+@register.function
+@contextfunction
+def get_context(context):
+    """
+    Provide access to the Jinja :class:`Context` object.
+
+    Example usage:
+        {% set context=get_context() %}
+        {% for k, v in context|dictsort %}
+            {% if not is_callable(v) %}
+                {{ k }}: {{ v }}<br/>
+            {% endif %}
+        {% endfor %}
+    """
+    return context
+
+
+@register.function
+def is_callable(thing):
+    """
+    Return True if thing is callable.
+
+    See get_context() for example usage.
+    """
+    return callable(thing)
