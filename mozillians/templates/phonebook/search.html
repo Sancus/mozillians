@@ -81,7 +81,7 @@
       {% endwith %}
       <div class="row">
       {% for person in people %}
-        {{ search_result(person) }}
+        {{ search_result(person.get_object()) }}
       {% endfor %}
       </div>
       {% with items=people %}

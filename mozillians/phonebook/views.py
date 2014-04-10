@@ -25,6 +25,7 @@ from mozillians.phonebook.models import Invite
 from mozillians.phonebook.utils import redeem_invite
 from mozillians.users.managers import EMPLOYEES, MOZILLIANS, PUBLIC, PRIVILEGED
 from mozillians.users.models import COUNTRIES, UserProfile
+from mozillians.users.search import UserProfileSearchMapping
 
 
 class BrowserIDVerify(Verify):
@@ -243,8 +244,10 @@ def search(request):
         public = not (request.user.is_authenticated()
                       and request.user.userprofile.is_vouched)
 
-        profiles = UserProfile.search(query, public=public,
+        search = UserProfileSearchMapping.search(query, public=public,
                                       include_non_vouched=include_non_vouched)
+        profiles = search.execute().objects
+
         if not public:
             groups = Group.search(query)
 
@@ -257,8 +260,8 @@ def search(request):
         except EmptyPage:
             people = paginator.page(paginator.num_pages)
 
-        if profiles.count() == 1 and not groups:
-            return redirect('phonebook:profile_view', people[0].user.username)
+        if len(profiles) == 1 and not groups:
+            return redirect('phonebook:profile_view', people[0].get_object().user.username)
 
         show_pagination = paginator.count > settings.ITEMS_PER_PAGE
 
